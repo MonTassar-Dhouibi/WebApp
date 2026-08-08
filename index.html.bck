@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El moufatech</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background-color: #f8f9fa; }
+        .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; }
+        .grid-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; align-items: flex-start; }
+        .grid-box { display: flex; flex-direction: column; }
+        .matrix { display: grid; grid-template-columns: repeat(16, 25px); gap: 1px; background-color: #ccc; border: 1px solid #999; width: max-content; transition: 0.3s; }
+        .cell, .pub-cell { width: 25px; height: 25px; background-color: white; cursor: pointer; position: relative; }
+        .pub-cell { cursor: not-allowed; }
+        .cell.active { background-color: #228B22; } 
+        .cell.locked-zero { background-color: #444; cursor: not-allowed; border: 1px solid #222; } 
+        .cell.locked-one { background-color: #0056b3; cursor: not-allowed; border: 1px solid #003d82; } 
+        .pub-cell.active-x { background-color: #e67e22; } 
+        .pub-cell.prefix-active { background-color: #8e44ad; } 
+        .pub-cell.prefix-inactive { background-color: #d2b4de; } 
+        .target-dot { position: absolute; width: 11px; height: 11px; background-color: #0dcaf0; border: 1px solid #000; top: 6px; left: 6px; pointer-events: none; border-radius: 2px; }
+        .slim-toolbar { display: flex; flex-wrap: wrap; gap: 5px; background: #e9ecef; padding: 8px; border-radius: 5px; border: 1px solid #ced4da; justify-content: center; width: max-content; }
+        .mini-btn { padding: 6px 10px; font-size: 0.9em; font-weight: bold; cursor: pointer; border: 1px solid #adb5bd; border-radius: 4px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .mini-btn:hover { background: #dee2e6; }
+        .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+        .btn-blue { color: #084298; border-color: #b6d4fe; background: #e3f2fd; }
+        .btn-gold { color: #664d03; border-color: #ffecb5; background: #fff3cd; }
+        .btn-green { color: #0f5132; border-color: #badbcc; background: #d1e7dd; }
+        .panel { background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ced4da; }
+        button { padding: 8px 16px; margin-right: 10px; cursor: pointer; margin-bottom: 10px; font-weight: bold;}
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .unlock-btn { background-color: #dc3545; color: white; border: none; border-radius: 5px; padding: 15px; font-size: 1.2em; width: 100%; display: none; margin-top: 15px; text-transform: uppercase; letter-spacing: 2px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+        .output-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        textarea, input[type="text"], input[type="number"] { width: 100%; font-family: monospace; padding: 8px; box-sizing: border-box; }
+        #matchStatus { margin-top: 15px; padding: 10px; text-align: center; font-size: 1.2em; font-weight: bold; border-radius: 5px; background-color: #e2e3e5; color: #383d41; border: 2px solid #d6d8db; transition: 0.3s; }
+        .status-nomatch { background-color: #f8d7da !important; color: #721c24 !important; border-color: #f5c6cb !important; }
+        .status-match { background-color: #d4edda !important; color: #155724 !important; border-color: #c3e6cb !important; font-size: 1.5em !important; box-shadow: 0 0 15px #28a745; }
+        #pubMatchCounter { font-size: 0.75em; margin-left: 15px; padding: 3px 8px; border-radius: 4px; background: #333; color: white; display: none; vertical-align: middle; }
+        #highestMatchCounter { font-size: 0.75em; margin-left: 5px; padding: 3px 8px; border-radius: 4px; background: #ffc107; color: #000; display: none; vertical-align: middle; border: 1px solid #d39e00;}
+        #copyBestBtn { font-size: 0.7em; margin-left: 5px; padding: 3px 6px; border-radius: 3px; background: #084298; color: white; border: none; cursor: pointer; display: none; vertical-align: middle; }
+        #copyBestBtn:active { background: #000; }
+        .footer { text-align: center; margin-top: 40px; margin-bottom: 20px; padding-top: 20px; border-top: 1px solid #ced4da; color: #6c757d; font-weight: bold; letter-spacing: 1px; }
+        
+        /* New Topography Toggle Bar */
+        .topology-bar { background: #212529; color: #fff; padding: 10px 15px; border-radius: 5px; margin-bottom: 10px; width: max-content; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .topology-bar input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+        .topology-bar label { margin: 0; cursor: pointer; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>El moufatech</h2>
+    <div class="panel">
+        <label style="display:inline;">Lock to Bitcoin Puzzle Range: #</label>
+        <input type="number" id="puzzleInput" style="width: 80px; display:inline;" min="1" max="256" value="135" onchange="clearGrid()">
+    </div>
+
+    <div class="panel" style="background: #fff3cd; border-color: #ffecb5; padding-bottom: 5px;">
+        <h3 style="margin-top:0; color: #664d03;">🦘 Kangaroo Jump Config</h3>
+        <div style="margin-bottom: 10px; font-size: 0.9em;">
+            <label style="display:inline; margin-right: 15px;"><input type="radio" name="jumpType" value="fraction" checked onchange="toggleJumpInputs()"> Fraction of Range</label>
+            <label style="display:inline;"><input type="radio" name="jumpType" value="manual" onchange="toggleJumpInputs()"> Manual Hex/Dec</label>
+        </div>
+        <div id="fractionInputGroup" style="margin-bottom: 10px;">
+            <label style="display:inline; font-weight:normal;">Jump Size = Range / </label>
+            <input type="number" id="jumpFraction" style="width: 100px; display:inline;" value="100" min="1">
+        </div>
+        <div id="manualInputGroup" style="display: none; margin-bottom: 10px;">
+            <label style="display:inline; font-weight:normal;">Jump Value:</label>
+            <input type="text" id="jumpManual" placeholder="e.g. 0x1A4 or 1000" style="width: 250px; display:inline;">
+        </div>
+    </div>
+
+    <div class="panel" style="background: #e3f2fd; border-color: #b6d4fe;">
+        <h3 style="margin-top:0; color: #084298;">Target Tracker & Global Ghost Overlay</h3>
+        <label><input type="checkbox" id="overlayToggle" onchange="applyOverlays()"> <b>Show Cyan Ghost Overlay</b></label>
+        <div style="margin-top: 10px;">
+            <label>Target Public Key (Hex):</label>
+            <input type="text" id="targetPubKey" value="02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16" placeholder="Paste 66-char Target Public Key" oninput="applyOverlays(); checkMatch();">
+        </div>
+        <div style="margin-top: 10px;">
+            <label>Target Address:</label>
+            <input type="text" id="targetAddressInput" value="16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v" placeholder="Enter 1... address to hunt" oninput="checkMatch()">
+        </div>
+        <div id="matchStatus">No Target Set</div>
+        <button id="unlockBtn" class="unlock-btn" onclick="unlockInterface()">🔓 Unfreeze & Restart</button>
+    </div>
+
+    <div style="margin-bottom: 20px; padding: 10px; background: #fff; border: 1px dashed #999;">
+        <div style="margin-bottom: 5px;">
+            <button class="control-btn" onclick="clearGrid()" style="background: #dc3545; color: white; border: none; border-radius: 3px;">Clear UI</button>
+            <button class="control-btn" onclick="inverseGrid()">Inverse Range</button>
+        </div>
+        <div>
+            <label style="display:inline;">Manual Import:</label>
+            <input type="text" id="manualPrivKey" placeholder="Paste 64-char Hex Key..." style="width: 60%; display:inline;">
+            <button class="control-btn" style="background-color: #007bff; color: white; border: none; border-radius: 3px;" onclick="loadManualKey()">Load Key</button>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        
+        <div class="topology-bar">
+            <input type="checkbox" id="hilbertToggle" onchange="toggleVisualization()">
+            <label for="hilbertToggle">🧬 Enable Hilbert Curve Topology</label>
+        </div>
+
+        <div class="grid-box">
+            <h3 style="margin-top:0; margin-bottom: 5px;">Private Key (256 bits)</h3>
+            <div id="privGrid" class="matrix"></div>
+        </div>
+        
+        <div class="slim-toolbar">
+            <button class="mini-btn btn-blue control-btn" onclick="moveToStart()" title="Start of Range">|&lt; Min</button>
+            <button class="mini-btn control-btn" onclick="executeJump(1n, false)" title="Step Back 1">-1</button>
+            <button class="mini-btn btn-gold control-btn" onclick="doJump(false)" title="Jump Backward">⏪ Jump</button>
+            <button class="mini-btn btn-green control-btn" onclick="randomizeGrid()" title="Randomize">🎲 Rand</button>
+            <button class="mini-btn btn-gold control-btn" onclick="doJump(true)" title="Jump Forward">Jump ⏩</button>
+            <button class="mini-btn control-btn" onclick="executeJump(1n, true)" title="Step Forward 1">+1</button>
+            <button class="mini-btn btn-blue control-btn" onclick="moveToEnd()" title="End of Range">Max &gt;|</button>
+        </div>
+        
+        <div class="grid-box">
+            <h3 style="margin-top:5px; margin-bottom: 5px; color: #e67e22;">
+                Public Key (264 bits)
+                <span id="pubMatchCounter"></span>
+                <span id="highestMatchCounter"></span>
+                <button id="copyBestBtn" onclick="copyGlobalBest()">📋 Copy Key</button>
+            </h3>
+            <div id="pubGrid" class="matrix"></div>
+        </div>
+    </div>
+
+    <div class="output-group"><label>Binary Representation (256 bits):</label><textarea id="binaryOutput" rows="3" readonly></textarea></div>
+    <div class="output-group"><label>Private Key (Hex):</label><input type="text" id="hexOutput" readonly></div>
+    <div class="output-group"><label>Compressed Public Key (Hex):</label><input type="text" id="pubHexOutput" readonly></div>
+    <div class="output-group"><label>Compressed BTC Address (Legacy):</label><input type="text" id="addressOutput" readonly></div>
+    
+    <div class="footer">
+        &copy; MonTassar Dhouibi
+    </div>
+</div>
+
+<script src="mobile_bundle.js"></script>
+
+<script>
+    const GRID_SIZE = 256;
+    let bits = new Array(GRID_SIZE).fill(0);
+    let currentPubBin = ""; 
+    let isFrozen = false; 
+    
+    // Global Memory Variables
+    let globalBestScore = 0;
+    let globalBestPrivKey = "";
+    let currentTargetPubHex = "";
+
+    const privGridElement = document.getElementById('privGrid');
+    const pubGridElement = document.getElementById('pubGrid');
+    const matchCounterBox = document.getElementById('pubMatchCounter');
+    const highestCounterBox = document.getElementById('highestMatchCounter');
+    const copyBestBtn = document.getElementById('copyBestBtn');
+
+    // --- HILBERT ALGORITHM ---
+    function getHilbertOrder(i) {
+        let n = 16;
+        let d = i;
+        let x = 0, y = 0;
+        for (let s = 1; s < n; s *= 2) {
+            let rx = 1 & (d >> 1);
+            let ry = 1 & (d ^ rx);
+            if (ry === 0) {
+                if (rx === 1) {
+                    x = s - 1 - x;
+                    y = s - 1 - y;
+                }
+                let temp = x; x = y; y = temp;
+            }
+            x += s * rx;
+            y += s * ry;
+            d >>= 2;
+        }
+        return y * 16 + x;
+    }
+
+    function toggleVisualization() {
+        const isHilbert = document.getElementById('hilbertToggle').checked;
+        const privCells = privGridElement.children;
+        const pubCells = pubGridElement.children;
+        
+        // Reorder Private Key Grid
+        for (let i = 0; i < 256; i++) {
+            if (privCells[i]) privCells[i].style.order = isHilbert ? getHilbertOrder(i) : i;
+        }
+        
+        // Reorder Public Key Grid (Handles the extra 8 bits cleanly at the end)
+        for (let i = 0; i < 264; i++) {
+            if (pubCells[i]) {
+                if (i < 256) {
+                    pubCells[i].style.order = isHilbert ? getHilbertOrder(i) : i;
+                } else {
+                    pubCells[i].style.order = isHilbert ? 256 + (i - 256) : i;
+                }
+            }
+        }
+    }
+    // -------------------------
+
+    function initGrid() {
+        for (let i = 0; i < GRID_SIZE; i++) {
+            const cell = document.createElement('div');
+            cell.dataset.index = i;
+            cell.addEventListener('click', () => toggleBit(i));
+            privGridElement.appendChild(cell);
+        }
+        clearGrid(); 
+        toggleVisualization();
+    }
+
+    // Force page refresh to read preserved text boxes
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const targetPub = document.getElementById('targetPubKey').value.trim();
+            if (targetPub.length === 66 && document.getElementById('overlayToggle').checked) {
+                applyOverlays();
+            }
+        }, 300);
+    });
+
+    function getTargetIndex() {
+        const p = parseInt(document.getElementById('puzzleInput').value) || 256;
+        return 256 - p; 
+    }
+
+    function toggleBit(index) {
+        if (isFrozen) return; 
+        const targetOne = getTargetIndex();
+        if (index <= targetOne) return;
+        bits[index] = bits[index] === 0 ? 1 : 0;
+        renderPrivGrid();
+    }
+
+    function enforcePuzzleBounds() {
+        const targetOne = getTargetIndex();
+        for (let i = 0; i < GRID_SIZE; i++) {
+            if (i < targetOne) bits[i] = 0;           
+            else if (i === targetOne) bits[i] = 1;    
+        }
+    }
+
+    function clearGrid() {
+        if (isFrozen) return; 
+        for (let i = 0; i < GRID_SIZE; i++) bits[i] = 0;
+        enforcePuzzleBounds();
+        const cells = privGridElement.children;
+        const targetOne = getTargetIndex();
+        for (let i = 0; i < GRID_SIZE; i++) {
+            cells[i].className = 'cell'; 
+            if (i < targetOne) cells[i].classList.add('locked-zero');
+            else if (i === targetOne) cells[i].classList.add('locked-one');
+            else if (bits[i] === 1) cells[i].classList.add('active');
+        }
+        document.getElementById('binaryOutput').value = bits.join('');
+        document.getElementById('hexOutput').value = "0".repeat(64);
+        document.getElementById('addressOutput').value = "Waiting for input...";
+        document.getElementById('pubHexOutput').value = "";
+        renderPubGrid("");
+        checkMatch("", "");
+    }
+
+    function moveToStart() {
+        if (isFrozen) return;
+        for (let i = 0; i < GRID_SIZE; i++) bits[i] = 0;
+        enforcePuzzleBounds();
+        renderPrivGrid();
+    }
+
+    function moveToEnd() {
+        if (isFrozen) return;
+        for (let i = 0; i < GRID_SIZE; i++) bits[i] = 1;
+        enforcePuzzleBounds();
+        renderPrivGrid();
+    }
+
+    function toggleJumpInputs() {
+        const type = document.querySelector('input[name="jumpType"]:checked').value;
+        if (type === 'fraction') {
+            document.getElementById('fractionInputGroup').style.display = 'block';
+            document.getElementById('manualInputGroup').style.display = 'none';
+        } else {
+            document.getElementById('fractionInputGroup').style.display = 'none';
+            document.getElementById('manualInputGroup').style.display = 'block';
+        }
+    }
+
+    function doJump(isForward) {
+        if (isFrozen) return;
+        const p = parseInt(document.getElementById('puzzleInput').value) || 256;
+        const type = document.querySelector('input[name="jumpType"]:checked').value;
+        let jumpVal = 0n;
+        try {
+            if (type === 'fraction') {
+                const denom = BigInt(document.getElementById('jumpFraction').value || 1);
+                const rangeSize = 1n << BigInt(p - 1); 
+                jumpVal = rangeSize / denom;
+                if (jumpVal === 0n) jumpVal = 1n; 
+            } else {
+                let manualStr = document.getElementById('jumpManual').value.trim();
+                if (!manualStr) return;
+                if (/^[0-9a-fA-F]+$/.test(manualStr) && !manualStr.startsWith('0x') && /[a-fA-F]/.test(manualStr)) {
+                    manualStr = '0x' + manualStr;
+                }
+                jumpVal = BigInt(manualStr);
+            }
+        } catch(e) { alert("Invalid jump value!"); return; }
+        executeJump(jumpVal, isForward);
+    }
+
+    function executeJump(jumpVal, isForward) {
+        if (isFrozen) return;
+        let currentKey = BigInt('0b' + bits.join(''));
+        if (isForward) currentKey += jumpVal;
+        else currentKey -= jumpVal;
+        const mask256 = (1n << 256n) - 1n;
+        currentKey = currentKey & mask256;
+        let binStr = currentKey.toString(2).padStart(256, '0');
+        for (let i = 0; i < 256; i++) bits[i] = parseInt(binStr[i]);
+        enforcePuzzleBounds();
+        renderPrivGrid();
+    }
+
+    function randomizeGrid() {
+        if (isFrozen) return;
+        for (let i = 0; i < GRID_SIZE; i++) bits[i] = Math.random() > 0.5 ? 1 : 0; 
+        enforcePuzzleBounds();
+        renderPrivGrid();
+    }
+
+    function inverseGrid() {
+        if (isFrozen) return;
+        const targetOne = getTargetIndex();
+        for (let i = 0; i < GRID_SIZE; i++) {
+            if (i > targetOne) bits[i] = bits[i] === 0 ? 1 : 0;
+        }
+        renderPrivGrid();
+    }
+
+    function loadManualKey() {
+        if (isFrozen) return;
+        let hex = document.getElementById('manualPrivKey').value.trim();
+        if (hex.length !== 64) { alert("Error: Private key must be exactly 64 characters."); return; }
+        let binString = '';
+        for (let i = 0; i < hex.length; i++) binString += parseInt(hex[i], 16).toString(2).padStart(4, '0');
+        for (let i = 0; i < 256; i++) bits[i] = parseInt(binString[i]);
+        renderPrivGrid();
+    }
+
+    function renderPrivGrid() {
+        const targetOne = getTargetIndex();
+        const cells = privGridElement.children;
+        for (let i = 0; i < GRID_SIZE; i++) {
+            cells[i].className = 'cell'; 
+            if (i < targetOne) cells[i].classList.add('locked-zero');
+            else if (i === targetOne) cells[i].classList.add('locked-one');
+            else if (bits[i] === 1) cells[i].classList.add('active');
+        }
+        processCryptography();
+    }
+
+    function processCryptography() {
+        const binString = bits.join('');
+        document.getElementById('binaryOutput').value = binString;
+        let hexString = '';
+        for (let i = 0; i < binString.length; i += 4) hexString += parseInt(binString.substring(i, i + 4), 2).toString(16);
+        hexString = hexString.padStart(64, '0');
+        document.getElementById('hexOutput').value = hexString;
+        
+        if (hexString === "0".repeat(64)) {
+            document.getElementById('addressOutput').value = "Waiting for valid key...";
+            renderPubGrid("");
+            checkMatch("", "");
+            return;
+        }
+
+        if (typeof BTC !== "undefined" && typeof BTC.deriveKeyData === "function") {
+            const cryptoData = BTC.deriveKeyData(hexString);
+            document.getElementById('addressOutput').value = cryptoData.address;
+            document.getElementById('pubHexOutput').value = cryptoData.pubKeyHex;
+            renderPubGrid(cryptoData.pubKeyHex);
+            checkMatch(cryptoData.address, cryptoData.pubKeyHex);
+        }
+    }
+
+    function renderPubGrid(pubHex) {
+        pubGridElement.innerHTML = ''; 
+        currentPubBin = '';
+        if (!pubHex) {
+            for (let i = 0; i < 264; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'pub-cell';
+                if (i < 8) cell.classList.add('prefix-inactive');
+                pubGridElement.appendChild(cell);
+            }
+            applyOverlays();
+            toggleVisualization();
+            return;
+        }
+
+        for (let i = 0; i < pubHex.length; i++) currentPubBin += parseInt(pubHex[i], 16).toString(2).padStart(4, '0');
+        for (let i = 0; i < currentPubBin.length; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'pub-cell';
+            if (currentPubBin[i] === '1') {
+                if (i < 8) cell.classList.add('prefix-active'); 
+                else cell.classList.add('active-x'); 
+            } else {
+                if (i < 8) cell.classList.add('prefix-inactive');
+            }
+            pubGridElement.appendChild(cell);
+        }
+        applyOverlays();
+        toggleVisualization();
+    }
+
+    function updateHighestUI() {
+        if (globalBestScore > 0) {
+            let bestPct = ((globalBestScore / 264) * 100).toFixed(1);
+            highestCounterBox.innerText = `🏆 Global Best: ${globalBestScore}/264 (${bestPct}%)`;
+            highestCounterBox.style.display = 'inline-block';
+            copyBestBtn.style.display = 'inline-block';
+        } else {
+            highestCounterBox.style.display = 'none';
+            copyBestBtn.style.display = 'none';
+        }
+    }
+
+    function copyGlobalBest() {
+        if (!globalBestPrivKey) return;
+        navigator.clipboard.writeText(globalBestPrivKey).then(() => {
+            copyBestBtn.innerText = "✅ Copied!";
+            copyBestBtn.style.background = "#198754";
+            setTimeout(() => {
+                copyBestBtn.innerText = "📋 Copy Key";
+                copyBestBtn.style.background = "#084298";
+            }, 2000);
+        });
+    }
+
+    async function applyOverlays() {
+        const showOverlay = document.getElementById('overlayToggle').checked;
+        matchCounterBox.style.display = 'none'; 
+        document.querySelectorAll('.target-dot').forEach(e => e.remove());
+        
+        if (!showOverlay) {
+            highestCounterBox.style.display = 'none';
+            copyBestBtn.style.display = 'none';
+            return;
+        }
+
+        const targetPubHex = document.getElementById('targetPubKey').value.trim();
+        
+        if (targetPubHex !== currentTargetPubHex && targetPubHex.length === 66) {
+            currentTargetPubHex = targetPubHex;
+            globalBestScore = 0;
+            globalBestPrivKey = "";
+            updateHighestUI();
+
+            try {
+                const res = await fetch(`/api/score?target=${targetPubHex}&_t=${Date.now()}`);
+                const data = await res.json();
+                if (data && data.score) {
+                    globalBestScore = data.score;
+                    globalBestPrivKey = data.privKey;
+                }
+            } catch(e) {
+                console.log("Offline or API not reachable yet");
+            }
+            updateHighestUI(); 
+        } else if (targetPubHex === "") {
+            highestCounterBox.style.display = 'none';
+            copyBestBtn.style.display = 'none';
+        }
+
+        if (targetPubHex.length === 66) { 
+            let bin = '';
+            for (let i = 0; i < 66; i++) bin += parseInt(targetPubHex[i], 16).toString(2).padStart(4, '0');
+            const cells = pubGridElement.children;
+            
+            if(cells.length === 264) {
+                let matchCount = 0;
+                
+                for (let i = 0; i < 264; i++) {
+                    if (bin[i] === '1') {
+                        let dot = document.createElement('div');
+                        dot.className = 'target-dot';
+                        cells[i].appendChild(dot);
+                    }
+                    if (currentPubBin && currentPubBin.length === 264) {
+                        if (currentPubBin[i] === bin[i]) matchCount++;
+                    }
+                }
+                
+                if (currentPubBin && currentPubBin.length === 264) {
+                    const currentPrivHex = document.getElementById('hexOutput').value;
+
+                    if (matchCount > globalBestScore) {
+                        globalBestScore = matchCount;
+                        globalBestPrivKey = currentPrivHex;
+                        updateHighestUI();
+                        
+                        fetch('/api/score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target: targetPubHex, score: globalBestScore, privKey: globalBestPrivKey })
+                        }).catch(e => console.log("Not connected to global DB yet"));
+                    }
+
+                    let pct = ((matchCount / 264) * 100).toFixed(1);
+                    matchCounterBox.innerText = `🎯 Live: ${matchCount}/264 (${pct}%)`;
+                    matchCounterBox.style.display = 'inline-block';
+                    
+                    if (matchCount === 264) matchCounterBox.style.backgroundColor = '#198754'; 
+                    else if (pct >= 75) { matchCounterBox.style.backgroundColor = '#0dcaf0'; matchCounterBox.style.color = '#000'; } 
+                    else if (pct >= 50) { matchCounterBox.style.backgroundColor = '#fd7e14'; matchCounterBox.style.color = '#fff'; } 
+                    else { matchCounterBox.style.backgroundColor = '#dc3545'; matchCounterBox.style.color = '#fff'; }
+                }
+            }
+        }
+    }
+
+    function checkMatch(derivedAddr, derivedPubHex) {
+        if (isFrozen) return; 
+        const targetAddr = document.getElementById('targetAddressInput').value.trim();
+        const targetPub = document.getElementById('targetPubKey').value.trim();
+        const statusBox = document.getElementById('matchStatus');
+        if (!derivedAddr) derivedAddr = document.getElementById('addressOutput').value;
+        if (!derivedPubHex) derivedPubHex = document.getElementById('pubHexOutput').value;
+
+        if (targetAddr === "" && targetPub === "") {
+            statusBox.className = '';
+            statusBox.innerText = "No Target Set";
+            return;
+        }
+
+        let matchFound = false;
+        if (targetAddr !== "" && targetAddr === derivedAddr) matchFound = true;
+        if (targetPub !== "" && targetPub === derivedPubHex) matchFound = true;
+
+        if (matchFound) {
+            statusBox.className = 'status-match';
+            statusBox.innerHTML = "🎉 FULL COLLISION MATCH! 🎉<br><span style='font-size: 0.6em; color: #155724;'>BOARD FROZEN</span>";
+            lockInterface();
+        } else {
+            statusBox.className = 'status-nomatch';
+            statusBox.innerText = "Hunting... (No Collision Yet)";
+        }
+    }
+
+    function lockInterface() {
+        isFrozen = true;
+        document.getElementById('unlockBtn').style.display = 'block'; 
+        document.getElementById('puzzleInput').disabled = true; 
+        const buttons = document.querySelectorAll('.control-btn');
+        buttons.forEach(btn => btn.disabled = true);
+    }
+
+    function unlockInterface() {
+        isFrozen = false;
+        document.getElementById('unlockBtn').style.display = 'none'; 
+        document.getElementById('puzzleInput').disabled = false; 
+        const buttons = document.querySelectorAll('.control-btn');
+        buttons.forEach(btn => btn.disabled = false);
+        const statusBox = document.getElementById('matchStatus');
+        statusBox.className = 'status-nomatch';
+        statusBox.innerText = "Target Locked: Resuming Hunt...";
+    }
+
+    initGrid();
+</script>
+</body>
+</html>
