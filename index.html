@@ -673,7 +673,7 @@
         
         const targetPubHex = document.getElementById('targetPubKey').value.trim();
         
-        if (targetPubHex !== currentTargetPubHex && targetPubHex.length === 66) {
+        if (targetPubHex.length === 66 && (targetPubHex !== currentTargetPubHex || !hasFetchedDB)) {
             currentTargetPubHex = targetPubHex;
             globalBestScore = 0;
             globalBestPrivKey = "";
@@ -682,7 +682,7 @@
             updateHighestUI();
 
             try {
-                if (!isAutoWalking) {
+                //if (!isAutoWalking) {
                     const resDelta = await fetch(`/api/deltas?target=${targetPubHex}&_t=${Date.now()}`);
                     const dataDelta = await resDelta.json();
                     
@@ -712,7 +712,7 @@
                         globalBestPrivKey = data.privKey;
                         updateHighestUI(); 
                     }
-                }
+                //}
             } catch(e) {
                 console.error("Failed to load DB", e);
                 hasFetchedDB = true; 
